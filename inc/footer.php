@@ -107,6 +107,13 @@
   id="formclose" action="email.php" method="POST"
   class="hidden fixed inset-0 z-50 items-center bg-primary/20 px-8">
   <input type="hidden" name="form_token" value="<?php echo htmlspecialchars($formToken ?? ((session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['form_token'])) ? $_SESSION['form_token'] : ''), ENT_QUOTES, 'UTF-8'); ?>">
+  <input type="hidden" name="form_load_time" value="<?php echo time(); ?>">
+  
+  <!-- HONEYPOT - Hidden from real users, bots will fill this -->
+  <div style="position: absolute; left: -9999px; opacity: 0; height: 0; overflow: hidden;" aria-hidden="true">
+    <label for="popup_website_url">Leave this field empty</label>
+    <input type="text" name="website_url" id="popup_website_url" tabindex="-1" autocomplete="off" />
+  </div>
 
   <div
     class="relative md:left-1/3 bg-white/80 backdrop-blur-md px-4 py-6 rounded-lg shadow-md md:w-full max-w-md top-1/4 md:top-20"
@@ -129,19 +136,27 @@
         <label class="block text-black mb-1">Name*</label>
         <input
           type="text" name="name"
+          id="popupNameInput"
           class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-gray-600"
           placeholder="Enter your name"
+          minlength="2"
+          maxlength="50"
+          pattern="[a-zA-Z\s]*"
           required
         />
+        <span class="text-red-500 text-xs hidden" id="popupNameError"></span>
       </div>
 
       <div class="mb-4">
         <label class="block text-black mb-1">Email</label>
         <input
           type="email" name="email"
+          id="popupEmailInput"
           class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-gray-600"
           placeholder="Enter your email"
+          maxlength="100"
         />
+        <span class="text-red-500 text-xs hidden" id="popupEmailError"></span>
       </div>
 
       <div class="mb-4">
@@ -150,7 +165,12 @@
           type="tel" id="phoneinput" name="phone"
           class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-gray-600"
           placeholder="Enter your WhatsApp number"
+          minlength="10"
+          maxlength="20"
+          pattern="[\d\s\-\+\(\)]{10,}"
+          required
         />
+        <span class="text-red-500 text-xs hidden" id="popupPhoneError"></span>
       </div>
 
       <div class="mb-4">
@@ -159,19 +179,174 @@
           type="text" id="addinput"
           class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-gray-600"
           placeholder="Enter your address" name="message"
+          maxlength="200"
         />
       </div>
 
+      <!-- Response Message for Popup -->
+      <div id="popupFormMessage" class="hidden p-3 rounded-lg text-center text-sm font-medium mb-4"></div>
+
       <button
         type="submit"
+        id="popupSubmitBtn"
         class="w-full bg-black text-white py-2 rounded hover:bg-blue-700 transition"
       >
-        Submit
+        <span id="popupSubmitText">Submit</span>
       </button>
     </div>
   </div>
 </form>
 </div>
+
+<!-- Popup Form Validation Script -->
+<script>
+(function() {
+  const popupForm = document.getElementById('formclose');
+  const popupNameInput = document.getElementById('popupNameInput');
+  const popupEmailInput = document.getElementById('popupEmailInput');
+  const popupPhoneInput = document.getElementById('phoneinput');
+  const popupSubmitBtn = document.getElementById('popupSubmitBtn');
+  const popupSubmitText = document.getElementById('popupSubmitText');
+  const popupFormMessage = document.getElementById('popupFormMessage');
+
+  // Validation functions (same as main form)
+  function validateName(name) {
+    if (!name || name.length < 2) return 'Name must be at least 2 characters';
+    if (name.length > 50) return 'Name must not exceed 50 characters';
+    if (!/^[a-zA-Z\s]*$/.test(name)) return 'Name should contain only letters and spaces';
+    if (/\d+/.test(name)) return 'Name should not contain numbers';
+    return null;
+  }
+
+  function validateEmail(email) {
+    if (!email) return null;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Invalid email format';
+    if (email.length > 100) return 'Email is too long';
+    return null;
+  }
+
+  function validatePhone(phone) {
+    if (!phone) return 'Phone is required';
+    const cleaned = phone.replace(/[\s\-\(\)]/g, '');
+    if (cleaned.startsWith('+91')) {
+      if (cleaned.length !== 13) return 'Invalid phone number';
+    } else {
+      if (cleaned.length !== 10) return 'Phone must be 10 digits';
+      if (!/^[6-9]/.test(cleaned)) return 'Please enter a valid number';
+    }
+    if (!/^[\d+]*$/.test(cleaned)) return 'Phone should contain only numbers';
+    return null;
+  }
+
+  function showPopupMessage(message, success) {
+    popupFormMessage.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+    if (success) {
+      popupFormMessage.classList.add('bg-green-100', 'text-green-700');
+      popupFormMessage.textContent = message;
+    } else {
+      popupFormMessage.classList.add('bg-red-100', 'text-red-700');
+      popupFormMessage.textContent = message;
+    }
+  }
+
+  // Real-time validation
+  if (popupNameInput) {
+    popupNameInput.addEventListener('blur', function() {
+      const error = validateName(this.value);
+      const errorEl = document.getElementById('popupNameError');
+      if (error) {
+        errorEl.textContent = error;
+        errorEl.classList.remove('hidden');
+        this.classList.add('border-red-500');
+      } else {
+        errorEl.classList.add('hidden');
+        this.classList.remove('border-red-500');
+      }
+    });
+  }
+
+  if (popupEmailInput) {
+    popupEmailInput.addEventListener('blur', function() {
+      const error = validateEmail(this.value);
+      const errorEl = document.getElementById('popupEmailError');
+      if (error) {
+        errorEl.textContent = error;
+        errorEl.classList.remove('hidden');
+        this.classList.add('border-red-500');
+      } else {
+        errorEl.classList.add('hidden');
+        this.classList.remove('border-red-500');
+      }
+    });
+  }
+
+  if (popupPhoneInput) {
+    popupPhoneInput.addEventListener('blur', function() {
+      const error = validatePhone(this.value);
+      const errorEl = document.getElementById('popupPhoneError');
+      if (error) {
+        errorEl.textContent = error;
+        errorEl.classList.remove('hidden');
+        this.classList.add('border-red-500');
+      } else {
+        errorEl.classList.add('hidden');
+        this.classList.remove('border-red-500');
+      }
+    });
+  }
+
+  // Form submission
+  if (popupForm) {
+    popupForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const nameError = validateName(popupNameInput?.value || '');
+      const emailError = validateEmail(popupEmailInput?.value || '');
+      const phoneError = validatePhone(popupPhoneInput?.value || '');
+
+      if (nameError || emailError || phoneError) {
+        showPopupMessage(nameError || emailError || phoneError, false);
+        return;
+      }
+
+      popupSubmitBtn.disabled = true;
+      popupSubmitText.textContent = 'Sending...';
+
+      try {
+        const formData = new FormData(popupForm);
+        const response = await fetch('email.php', {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          if (result.redirect) {
+            window.location.href = result.redirect;
+            return;
+          }
+          showPopupMessage(result.message, true);
+          popupForm.reset();
+          setTimeout(() => {
+            popupFormMessage.classList.add('hidden');
+            togglePops();
+          }, 3000);
+        } else {
+          showPopupMessage(result.message, false);
+        }
+      } catch (error) {
+        showPopupMessage('An error occurred. Please try again.', false);
+        console.error('Error:', error);
+      } finally {
+        popupSubmitBtn.disabled = false;
+        popupSubmitText.textContent = 'Submit';
+      }
+    });
+  }
+})();
+</script>
 
 <div id="emiPopup" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeEmiPopup()"></div>

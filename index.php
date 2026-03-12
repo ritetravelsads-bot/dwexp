@@ -1639,8 +1639,16 @@ $formToken = $_SESSION['form_token'];
             </p>
           </div>
 
-          <form id="contactForm" action="email.php" method="POST" class="max-w-2xl mx-auto space-y-6" novalidate>
+<form id="contactForm" action="email.php" method="POST" class="max-w-2xl mx-auto space-y-6" novalidate>
             <input type="hidden" name="form_token" value="<?php echo htmlspecialchars($formToken, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="form_load_time" value="<?php echo time(); ?>">
+            
+            <!-- HONEYPOT - Hidden from real users, bots will fill this -->
+            <div style="position: absolute; left: -9999px; opacity: 0; height: 0; overflow: hidden;" aria-hidden="true">
+              <label for="website_url">Leave this field empty</label>
+              <input type="text" name="website_url" id="website_url" tabindex="-1" autocomplete="off" />
+            </div>
+            
             <!-- Full Name -->
             <div>
               <label class="block text-sm font-semibold text-dark mb-2"

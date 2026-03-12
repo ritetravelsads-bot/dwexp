@@ -32,6 +32,10 @@ define('FORM_CAPTCHA_WINDOW_SECONDS', 86400); // 24 hours
 define('RATE_LIMIT_WINDOW', 600); // 10 minutes
 define('MAX_ATTEMPTS', 3);
 
+// Anti-bot configuration
+define('MIN_FORM_SUBMIT_TIME', 3); // Minimum seconds between page load and form submit (bots are instant)
+define('MAX_FORM_SUBMIT_TIME', 3600); // Maximum seconds (1 hour - stale tokens)
+
 // Helper function to set response
 function setResponse($success, $message, $extra = []) {
     header('Content-Type: application/json');
@@ -69,7 +73,11 @@ function detectSpamContent($text) {
         'xxx', 'adult', 'dating', 'loans', 'mortgage', 'payday',
         'nigerian', 'prince', 'fund your account', 'claim prize',
         'dear friend', 'dear sir', 'dear madam', 'greetings',
-        'udacious', 'undisclosed', 'confidential arrangement'
+        'udacious', 'undisclosed', 'confidential arrangement',
+        'seo services', 'backlinks', 'rank #1', 'google ranking',
+        'cbd oil', 'weight loss', 'diet pills', 'enhancement',
+        'investment opportunity', 'double your', 'guaranteed returns',
+        'wire transfer', 'bank details', 'routing number'
     ];
     
     $textLower = strtolower($text);
@@ -82,9 +90,14 @@ function detectSpamContent($text) {
     }
     
     // Check for excessive URLs
-    $urlCount = substr_count($text, 'http://') + substr_count($text, 'https://');
-    if ($urlCount > 2) {
-        return "Too many URLs detected ($urlCount found)";
+    $urlCount = substr_count($text, 'http://') + substr_count($text, 'https://') + substr_count($text, 'www.');
+    if ($urlCount > 1) {
+        return "URLs not allowed in form submissions";
+    }
+    
+    // Check for HTML tags (common in spam)
+    if (preg_match('/<[^>]+>/', $text)) {
+        return "HTML tags are not allowed";
     }
     
     // Check for repeated special characters (!!!!!!, ????, etc.)
@@ -112,7 +125,36 @@ function detectSpamContent($text) {
         return "Excessive character repetition detected";
     }
     
+    // Check for Cyrillic or other non-Latin scripts (common in spam from certain regions)
+    if (preg_match('/[\x{0400}-\x{04FF}]/u', $text)) {
+        return "Invalid characters detected";
+    }
+    
     return null;
+}
+
+// Check if name looks like a real person's name (not gibberish)
+function isValidHumanName($name) {
+    // Must have at least one vowel
+    if (!preg_match('/[aeiouAEIOU]/', $name)) {
+        return false;
+    }
+    
+    // Check for common bot patterns (random characters)
+    if (preg_match('/[bcdfghjklmnpqrstvwxyz]{5,}/i', $name)) {
+        return false; // 5+ consonants in a row is suspicious
+    }
+    
+    // Check for keyboard mashing patterns
+    $keyboardPatterns = ['asdf', 'qwer', 'zxcv', 'jkl;', 'uiop', '1234', 'abcd'];
+    $nameLower = strtolower($name);
+    foreach ($keyboardPatterns as $pattern) {
+        if (strpos($nameLower, $pattern) !== false) {
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 // LEVEL 3: Comprehensive backend validation
@@ -130,6 +172,8 @@ function validateFormData($name, $email, $phone) {
         $errors[] = 'Name contains invalid characters';
     } elseif (preg_match('/\d/', $name)) {
         $errors[] = 'Name should not contain numbers';
+    } elseif (!isValidHumanName($name)) {
+        $errors[] = 'Please enter a valid name';
     }
     
     // Check for spam content in name
@@ -463,6 +507,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (isIpBlocked($ipRecord, $now)) {
         setResponse(false, 'This IP is blocked for 24 hours due to repeated spam/captcha failures.');
+    }
+
+    // HONEYPOT CHECK - if this hidden field is filled, it's a bot
+    $honeypot = isset($_POST['website_url']) ? trim($_POST['website_url']) : '';
+    if (!empty($honeypot)) {
+        // Silently block - don't give bots useful feedback
+        blockIpForOneDay($ip, $now);
+        error_log("HONEYPOT TRIGGERED: IP $ip filled honeypot field with: $honeypot");
+        setResponse(false, 'Form submission failed. Please try again.');
+    }
+
+    // TIME-BASED CHECK - form submitted too quickly (bot) or token too old (stale/replay)
+    $formLoadTime = isset($_POST['form_load_time']) ? (int)$_POST['form_load_time'] : 0;
+    if ($formLoadTime > 0) {
+        $timeTaken = $now - $formLoadTime;
+        if ($timeTaken < MIN_FORM_SUBMIT_TIME) {
+            // Submitted too fast - likely a bot
+            blockIpForOneDay($ip, $now);
+            error_log("TIME CHECK FAILED: IP $ip submitted form in $timeTaken seconds (too fast)");
+            setResponse(false, 'Form submission failed. Please try again.');
+        }
+        if ($timeTaken > MAX_FORM_SUBMIT_TIME) {
+            // Token too old - could be replay attack or stale session
+            error_log("TIME CHECK FAILED: IP $ip submitted form after $timeTaken seconds (too old)");
+            setResponse(false, 'Your session has expired. Please refresh the page and try again.');
+        }
     }
 
     $submittedToken = isset($_POST['form_token']) ? (string)$_POST['form_token'] : '';
