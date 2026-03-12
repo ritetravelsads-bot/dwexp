@@ -656,15 +656,8 @@ if ($httpCode < 200 || $httpCode >= 300) {
         <div class="p-6 rounded-lg border" style="background-color: var(--dark); border-color: var(--border-grey);">
 <form id="projectContactForm" action="email.php" method="POST" class="space-y-4" novalidate>
                 <input type="hidden" name="form_token" value="<?= htmlspecialchars($formToken, ENT_QUOTES, 'UTF-8') ?>">
-                <input type="hidden" name="form_load_time" value="<?= time() ?>">
                 <input type="hidden" name="subject" value="<?= htmlspecialchars('Site visit request: ' . ($project['name'] ?? 'Project')) ?>">
                 <input type="hidden" name="project" value="<?= htmlspecialchars($project['name']) ?>">
-                
-                <!-- HONEYPOT - Hidden from real users, bots will fill this -->
-                <div style="position: absolute; left: -9999px; opacity: 0; height: 0; overflow: hidden;" aria-hidden="true">
-                    <label for="project_website_url">Leave this field empty</label>
-                    <input type="text" name="website_url" id="project_website_url" tabindex="-1" autocomplete="off">
-                </div>
 
                 <div>
                     <label class="block text-sm font-medium mb-1 text-white">Name*</label>

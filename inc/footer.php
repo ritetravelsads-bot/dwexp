@@ -107,13 +107,6 @@
   id="formclose" action="email.php" method="POST"
   class="hidden fixed inset-0 z-50 items-center bg-primary/20 px-8">
   <input type="hidden" name="form_token" value="<?php echo htmlspecialchars($formToken ?? ((session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['form_token'])) ? $_SESSION['form_token'] : ''), ENT_QUOTES, 'UTF-8'); ?>">
-  <input type="hidden" name="form_load_time" value="<?php echo time(); ?>">
-  
-  <!-- HONEYPOT - Hidden from real users, bots will fill this -->
-  <div style="position: absolute; left: -9999px; opacity: 0; height: 0; overflow: hidden;" aria-hidden="true">
-    <label for="popup_website_url">Leave this field empty</label>
-    <input type="text" name="website_url" id="popup_website_url" tabindex="-1" autocomplete="off" />
-  </div>
 
   <div
     class="relative md:left-1/3 bg-white/80 backdrop-blur-md px-4 py-6 rounded-lg shadow-md md:w-full max-w-md top-1/4 md:top-20"
