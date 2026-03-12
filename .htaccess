@@ -1,0 +1,55 @@
+Options -Indexes
+
+# Enable URL rewriting
+RewriteEngine On
+RewriteBase /
+
+# 1. Strip accidental filesystem prefixes
+RewriteRule ^home/[^/]+/public_html/(.*)$ /$1 [L,R=301,NC]
+
+# 2. If requested path is an actual file or directory, do nothing
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Custom Page Rules
+RewriteRule ^about/?$ about.php [L]
+RewriteRule ^projects/?$ projects.php [L,QSA,NC]
+
+# 3. Handle property-detail (Two-segment paths)
+RewriteRule ^([A-Za-z0-9_-]+)/([A-Za-z0-9_-]+)/?$ property-detail.php?slug=$1/$2 [L,QSA,NC]
+
+# 4. Handle root project slugs (Single-segment paths)
+RewriteRule ^([A-Za-z0-9\-]+)/?$ projects.php?slug=$1 [L,QSA,NC]
+
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php82___lsphp .php .php8 .phtml
+</IfModule>
+
+# Redirect 404s
+ErrorDocument 404 /redirect-404.html
+
+# =======================================================
+# NEW: BROWSER CACHING RULES (Speed Fix)
+# =======================================================
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Images (Cache for 1 Year)
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/x-icon "access plus 1 year"
+
+    # CSS & JS (Cache for 1 Month)
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+
+    # Fonts (Cache for 1 Year)
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+</IfModule>
